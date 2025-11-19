@@ -1,0 +1,35 @@
+{
+  "properties": [
+    {
+      "name": "cache.multilevel.local-cache-max-size",
+      "type": "java.lang.Long",
+      "description": "最大本地 Caffeine 缓存条数。",
+      "defaultValue": 1000
+    },
+    {
+      "name": "cache.multilevel.local-cache-expire-seconds",
+      "type": "java.lang.Long",
+      "description": "本地缓存写入后过期时间（秒）。",
+      "defaultValue": 300
+    },
+    {
+      "name": "cache.multilevel.redis-cache-expire-seconds",
+      "type": "java.lang.Long",
+      "description": "Redis 二级缓存写入后过期时间（秒）。",
+      "defaultValue": 3600
+    },
+    {
+      "name": "cache.multilevel.redis-timeout",
+      "type": "java.lang.Long",
+      "description": "与 Redis 交互时的超时设置（秒）。",
+      "defaultValue": 3
+    },
+    {
+      "name": "cache.multilevel.invalidation-channel",
+      "type": "java.lang.String",
+      "description": "缓存失效广播的 Redis Pub/Sub 频道名称。",
+      "defaultValue": "cache:invalidation"
+    }
+  ]
+}
+
