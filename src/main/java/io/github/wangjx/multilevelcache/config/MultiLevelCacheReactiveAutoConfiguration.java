@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 @AutoConfiguration
 @ConditionalOnClass({ReactiveRedisTemplate.class, ReactiveRedisConnectionFactory.class, CacheManager.class})
 @ConditionalOnBean(ReactiveRedisConnectionFactory.class)
-@ConditionalOnMissingBean(name = "redisTemplate") // 只在没有普通 Redis 时才启用
+//@ConditionalOnMissingBean(name = "redisTemplate") // 只在没有普通 Redis 时才启用
 @EnableConfigurationProperties(MultiLevelCacheProperties.class)
 public class MultiLevelCacheReactiveAutoConfiguration {
 
