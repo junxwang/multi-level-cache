@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 ![Java Version](https://img.shields.io/badge/java-17%2B-orange)
-![Spring Boot](https://img.shields.io/badge/spring--boot-3.4.4-green)
+![Spring Boot](https://img.shields.io/badge/spring--boot-3.4.9-green)
 
 基于 Spring Boot 的多级缓存框架，支持本地缓存（Caffeine）和分布式缓存（Redis）的组合使用，有效提升系统性能并解决缓存穿透、击穿、雪崩等问题。
 
