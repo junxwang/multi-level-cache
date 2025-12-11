@@ -1,31 +1,30 @@
 package io.github.wangjx.multilevelcache;
 
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
-import reactor.core.publisher.Flux;
+import io.github.wangjx.multilevelcache.operations.LockOperations;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 基于Redis的分布式锁实现（Reactive）
+ * 基于Redis的分布式锁实现（支持 Reactive 和普通 Redis）
  * @author wangjx
  */
 public class DistributedLock {
     
-    private final ReactiveStringRedisTemplate redisTemplate;
+    private final LockOperations lockOperations;
     private final String lockKey;
     private final String lockValue;
     private final long expireTime;
     private final TimeUnit timeUnit;
     
-    private DistributedLock(ReactiveStringRedisTemplate redisTemplate,
+    private DistributedLock(LockOperations lockOperations,
                            String lockKey,
                            long expireTime,
                            TimeUnit timeUnit) {
-        this.redisTemplate = redisTemplate;
+        this.lockOperations = lockOperations;
         this.lockKey = "lock:" + lockKey;
         this.lockValue = UUID.randomUUID().toString();
         this.expireTime = expireTime;
@@ -35,17 +34,17 @@ public class DistributedLock {
     /**
      * 创建分布式锁实例
      * 
-     * @param redisTemplate Redis模板
+     * @param lockOperations 锁操作接口
      * @param lockKey 锁的key
      * @param expireTime 过期时间
      * @param timeUnit 时间单位
      * @return 分布式锁实例
      */
-    public static DistributedLock create(ReactiveStringRedisTemplate redisTemplate,
+    public static DistributedLock create(LockOperations lockOperations,
                                         String lockKey,
                                         long expireTime,
                                         TimeUnit timeUnit) {
-        return new DistributedLock(redisTemplate, lockKey, expireTime, timeUnit);
+        return new DistributedLock(lockOperations, lockKey, expireTime, timeUnit);
     }
 
     /**
@@ -54,9 +53,11 @@ public class DistributedLock {
      * @return Mono<Boolean> true表示获取成功，false表示获取失败
      */
     public Mono<Boolean> tryLock() {
-        return redisTemplate.opsForValue()
-                .setIfAbsent(lockKey, lockValue, Duration.ofMillis(timeUnit.toMillis(expireTime)))
-                .defaultIfEmpty(false);
+        return lockOperations.setIfAbsent(
+                lockKey, 
+                lockValue, 
+                Duration.ofMillis(timeUnit.toMillis(expireTime))
+        );
     }
 
     /**
@@ -95,9 +96,9 @@ public class DistributedLock {
     /**
      * 释放锁
      *
-     * @return Mono<Boolean> true表示释放成功
+     * @return Mono<Long> 返回删除的key数量，1表示释放成功，0表示释放失败
      */
-    public Flux unlock() {
+    public Mono<Long> unlock() {
         // 使用Lua脚本确保原子性：只有锁的持有者才能释放锁
         String luaScript = 
             "if redis.call('get', KEYS[1]) == ARGV[1] then " +
@@ -106,10 +107,11 @@ public class DistributedLock {
             "    return 0 " +
             "end";
         
-        return redisTemplate.execute( new DefaultRedisScript(
-                luaScript, Boolean.class), 
-                java.util.Collections.singletonList(lockKey), 
-                lockValue);
+        return lockOperations.executeScript(
+                luaScript, 
+                Collections.singletonList(lockKey), 
+                lockValue
+        );
     }
 
     /**
@@ -118,7 +120,7 @@ public class DistributedLock {
      * @return Mono<Boolean> true表示锁存在
      */
     public Mono<Boolean> isLocked() {
-        return redisTemplate.hasKey(lockKey);
+        return lockOperations.hasKey(lockKey);
     }
 
     /**

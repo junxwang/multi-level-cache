@@ -1,6 +1,6 @@
 package io.github.wangjx.multilevelcache;
 
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import io.github.wangjx.multilevelcache.operations.LockOperations;
 import reactor.core.publisher.Mono;
 
 import java.util.concurrent.TimeUnit;
@@ -8,23 +8,23 @@ import java.util.function.Function;
 
 /**
  * 分布式锁管理器
- * 提供便捷的锁操作方法
+ * 提供便捷的锁操作方法（支持 Reactive 和普通 Redis）
  * @author wangjx
  */
 public class LockManager {
     
-    private final ReactiveStringRedisTemplate redisTemplate;
+    private final LockOperations lockOperations;
     private final long defaultExpireTime;
     private final TimeUnit defaultTimeUnit;
     private final long defaultWaitTime;
     private final TimeUnit defaultWaitTimeUnit;
 
-    public LockManager(ReactiveStringRedisTemplate redisTemplate,
+    public LockManager(LockOperations lockOperations,
                       long defaultExpireTime,
                       TimeUnit defaultTimeUnit,
                       long defaultWaitTime,
                       TimeUnit defaultWaitTimeUnit) {
-        this.redisTemplate = redisTemplate;
+        this.lockOperations = lockOperations;
         this.defaultExpireTime = defaultExpireTime;
         this.defaultTimeUnit = defaultTimeUnit;
         this.defaultWaitTime = defaultWaitTime;
@@ -77,7 +77,7 @@ public class LockManager {
                                        long waitTime,
                                        TimeUnit waitTimeUnit,
                                        Function<DistributedLock, Mono<T>> action) {
-        DistributedLock lock = DistributedLock.create(redisTemplate, lockKey, expireTime, timeUnit);
+        DistributedLock lock = DistributedLock.create(lockOperations, lockKey, expireTime, timeUnit);
         
         return lock.tryLock(waitTime, waitTimeUnit)
                 .flatMap(acquired -> {
@@ -88,7 +88,11 @@ public class LockManager {
                     return action.apply(lock)
                             .doFinally(signalType -> {
                                 // 无论成功还是失败，都要释放锁
-                                lock.unlock().subscribe();
+                                lock.unlock()
+                                        .doOnError(error -> 
+                                                org.slf4j.LoggerFactory.getLogger(LockManager.class)
+                                                        .warn("Failed to release lock: " + lockKey, error))
+                                        .subscribe();
                             });
                 });
     }
@@ -100,7 +104,7 @@ public class LockManager {
      * @return 分布式锁实例
      */
     public DistributedLock createLock(String lockKey) {
-        return DistributedLock.create(redisTemplate, lockKey, defaultExpireTime, defaultTimeUnit);
+        return DistributedLock.create(lockOperations, lockKey, defaultExpireTime, defaultTimeUnit);
     }
 
     /**
@@ -112,7 +116,7 @@ public class LockManager {
      * @return 分布式锁实例
      */
     public DistributedLock createLock(String lockKey, long expireTime, TimeUnit timeUnit) {
-        return DistributedLock.create(redisTemplate, lockKey, expireTime, timeUnit);
+        return DistributedLock.create(lockOperations, lockKey, expireTime, timeUnit);
     }
 }
 

@@ -4,10 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import io.github.wangjx.multilevelcache.CacheInvalidationService;
+import io.github.wangjx.multilevelcache.LockManager;
 import io.github.wangjx.multilevelcache.MultiLevelCacheManager;
 import io.github.wangjx.multilevelcache.invalidation.NonReactiveCacheInvalidationService;
 import io.github.wangjx.multilevelcache.operations.CacheOperations;
+import io.github.wangjx.multilevelcache.operations.LockOperations;
 import io.github.wangjx.multilevelcache.operations.NonReactiveCacheOperations;
+import io.github.wangjx.multilevelcache.operations.NonReactiveLockOperations;
 import io.github.wangjx.multilevelcache.properties.MultiLevelCacheProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,6 +130,35 @@ public class MultiLevelCacheNonReactiveAutoConfiguration {
                 properties.getLocalCacheMaxSize(), properties.getLocalCacheExpireSeconds(),
                 properties.getRedisCacheExpireSeconds(), properties.getRedisTimeout());
         return new MultiLevelCacheManager(cacheOperations, properties, cacheInvalidationService);
+    }
+
+    /**
+     * 配置锁操作接口（普通 Redis 实现）
+     */
+    @Bean
+    @ConditionalOnMissingBean(LockOperations.class)
+    public LockOperations lockOperations(StringRedisTemplate stringRedisTemplate) {
+        log.debug("Creating NonReactiveLockOperations");
+        return new NonReactiveLockOperations(stringRedisTemplate);
+    }
+
+    /**
+     * 配置分布式锁管理器
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public LockManager lockManager(LockOperations lockOperations,
+                                  MultiLevelCacheProperties properties) {
+        // 默认锁过期时间：30秒
+        // 默认等待时间：5秒
+        log.debug("Creating LockManager with NonReactiveLockOperations");
+        return new LockManager(
+                lockOperations,
+                30,
+                java.util.concurrent.TimeUnit.SECONDS,
+                5,
+                java.util.concurrent.TimeUnit.SECONDS
+        );
     }
 
     @Bean

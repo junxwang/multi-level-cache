@@ -8,8 +8,12 @@ import io.github.wangjx.multilevelcache.LockManager;
 import io.github.wangjx.multilevelcache.MultiLevelCacheManager;
 import io.github.wangjx.multilevelcache.invalidation.ReactiveCacheInvalidationService;
 import io.github.wangjx.multilevelcache.operations.CacheOperations;
+import io.github.wangjx.multilevelcache.operations.LockOperations;
 import io.github.wangjx.multilevelcache.operations.ReactiveCacheOperations;
+import io.github.wangjx.multilevelcache.operations.ReactiveLockOperations;
 import io.github.wangjx.multilevelcache.properties.MultiLevelCacheProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -24,8 +28,6 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Reactive Redis 多级缓存自动配置类
@@ -125,16 +127,27 @@ public class MultiLevelCacheReactiveAutoConfiguration {
     }
 
     /**
+     * 配置锁操作接口（Reactive 实现）
+     */
+    @Bean
+    @ConditionalOnMissingBean(LockOperations.class)
+    public LockOperations lockOperations(ReactiveStringRedisTemplate reactiveStringRedisTemplate) {
+        log.debug("Creating ReactiveLockOperations");
+        return new ReactiveLockOperations(reactiveStringRedisTemplate);
+    }
+
+    /**
      * 配置分布式锁管理器
      */
     @Bean
     @ConditionalOnMissingBean
-    public LockManager lockManager(ReactiveStringRedisTemplate reactiveStringRedisTemplate,
+    public LockManager lockManager(LockOperations lockOperations,
                                   MultiLevelCacheProperties properties) {
         // 默认锁过期时间：30秒
         // 默认等待时间：5秒
+        log.debug("Creating LockManager with ReactiveLockOperations");
         return new LockManager(
-                reactiveStringRedisTemplate,
+                lockOperations,
                 30,
                 java.util.concurrent.TimeUnit.SECONDS,
                 5,
